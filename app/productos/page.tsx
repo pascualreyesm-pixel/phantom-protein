@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { productos } from "@/lib/productos";
 import AgregarCarritoBoton from "@/components/agregar-carrito-boton";
+import SchemaProductos from "@/components/schema-productos";
 
 const dorado =
   "bg-gradient-to-r from-[#BF953F] via-[#FCF6BA] via-[#B38728] via-[#FBF5B7] to-[#AA771C] bg-clip-text text-transparent";
@@ -14,6 +15,8 @@ export const metadata: Metadata = {
 export default function ProductosPage() {
   return (
     <section className="bg-black px-6 py-32">
+      <SchemaProductos />
+
       <div className="mx-auto mb-16 max-w-3xl text-center">
         <span className="mb-4 inline-block rounded-full border border-[#D4AF37]/30 bg-white/5 px-4 py-2 text-sm tracking-widest text-white">
           CATÁLOGO COMPLETO

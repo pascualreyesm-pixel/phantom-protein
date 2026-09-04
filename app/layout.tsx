@@ -42,6 +42,30 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  openGraph: {
+    title: "Phantom Protein | La proteína de mayor poder biológico",
+    description:
+      "Proteína, creatina y colágeno premium. Alta biodisponibilidad, sin azúcar añadida, sin sellos.",
+    url: "https://phantomprotein.cl",
+    siteName: "Phantom Protein",
+    locale: "es_CL",
+    type: "website",
+    images: [
+      {
+        url: "/images/phantom/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Phantom Protein",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Phantom Protein | La proteína de mayor poder biológico",
+    description:
+      "Proteína, creatina y colágeno premium. Alta biodisponibilidad, sin azúcar añadida, sin sellos.",
+    images: ["/images/phantom/og-image.jpg"],
+  },
 };
 
 export default function RootLayout({
