@@ -1,123 +1,179 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { productos, COSTO_ENVIO } from "@/lib/productos";
-import { generarNumeroPedido, ESTADO_LABEL } from "@/lib/pedidos";
+import { generarNumeroPedido } from "@/lib/pedidos";
 import { paymentProvider } from "@/lib/payment";
+import { getSupabaseServer } from "@/lib/supabase/server";
+import type { ClientePedido, ItemPedido } from "@/lib/payment/types";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const runtime = "nodejs";
 
-type ItemRecibido = { id: string; cantidad: number };
+function rutValido(rut: string) {
+  const limpio = rut.replace(/\./g, "").replace(/-/g, "").toUpperCase();
+  if (limpio.length < 2) return false;
+  const cuerpo = limpio.slice(0, -1);
+  const dv = limpio.slice(-1);
+  if (!/^\d+$/.test(cuerpo)) return false;
+
+  let suma = 0;
+  let multiplo = 2;
+  for (let i = cuerpo.length - 1; i >= 0; i--) {
+    suma += parseInt(cuerpo[i], 10) * multiplo;
+    multiplo = multiplo === 7 ? 2 : multiplo + 1;
+  }
+
+  const resto = 11 - (suma % 11);
+  const dvEsperado = resto === 11 ? "0" : resto === 10 ? "K" : String(resto);
+  return dv === dvEsperado;
+}
+
+function texto(valor: unknown) {
+  return typeof valor === "string" ? valor.trim() : "";
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, cliente } = body as {
-      items: ItemRecibido[];
-      cliente: {
-        nombre: string;
-        apellido: string;
-        rut: string;
-        email: string;
-        telefono: string;
-        direccion: string;
-        numero: string;
-        depto?: string;
-        comuna: string;
-        region: string;
-      };
+    const itemsRecibidos = Array.isArray(body?.items) ? body.items : [];
+    const cliente = body?.cliente as Partial<ClientePedido> | undefined;
+
+    if (itemsRecibidos.length === 0) {
+      return NextResponse.json({ error: "El carrito está vacío." }, { status: 400 });
+    }
+
+    const clienteNormalizado: ClientePedido = {
+      nombre: texto(cliente?.nombre),
+      apellido: texto(cliente?.apellido),
+      rut: texto(cliente?.rut).toUpperCase(),
+      email: texto(cliente?.email).toLowerCase(),
+      telefono: texto(cliente?.telefono),
+      direccion: texto(cliente?.direccion),
+      numero: texto(cliente?.numero),
+      depto: texto(cliente?.depto),
+      comuna: texto(cliente?.comuna),
+      region: texto(cliente?.region),
     };
 
-    if (!items?.length) {
-      return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
-    }
-    const camposRequeridos = [
+    const camposRequeridos: (keyof ClientePedido)[] = [
       "nombre", "apellido", "rut", "email", "telefono",
       "direccion", "numero", "comuna", "region",
-    ] as const;
+    ];
+
     for (const campo of camposRequeridos) {
-      if (!cliente?.[campo]) {
-        return NextResponse.json(
-          { error: `Falta el campo: ${campo}` },
-          { status: 400 }
-        );
+      if (!clienteNormalizado[campo]) {
+        return NextResponse.json({ error: `Falta el campo: ${campo}` }, { status: 400 });
       }
     }
 
-    const itemsResueltos = items.map((item) => {
-      const producto = productos.find((p) => p.id === item.id);
-      if (!producto) throw new Error(`Producto no encontrado: ${item.id}`);
-      return {
+    if (!rutValido(clienteNormalizado.rut)) {
+      return NextResponse.json({ error: "RUT inválido." }, { status: 400 });
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(clienteNormalizado.email)) {
+      return NextResponse.json({ error: "Correo inválido." }, { status: 400 });
+    }
+
+    const itemsResueltos: ItemPedido[] = [];
+
+    for (const item of itemsRecibidos) {
+      const id = texto(item?.id);
+      const cantidad = Number(item?.cantidad);
+
+      if (!id || !Number.isInteger(cantidad) || cantidad < 1 || cantidad > 20) {
+        return NextResponse.json(
+          { error: "Hay un producto o cantidad inválida en el carrito." },
+          { status: 400 }
+        );
+      }
+
+      const producto = productos.find((p) => p.id === id);
+      if (!producto) {
+        return NextResponse.json({ error: `Producto no encontrado: ${id}` }, { status: 400 });
+      }
+
+      itemsResueltos.push({
+        id: producto.id,
         nombre: producto.nombre,
         precio: producto.precio,
-        cantidad: item.cantidad,
-        subtotal: producto.precio * item.cantidad,
-      };
-    });
+        cantidad,
+        subtotal: producto.precio * cantidad,
+      });
+    }
 
-    const subtotal = itemsResueltos.reduce((acc, i) => acc + i.subtotal, 0);
+    const subtotal = itemsResueltos.reduce((acc, item) => acc + item.subtotal, 0);
     const total = subtotal + COSTO_ENVIO;
     const numero = generarNumeroPedido();
-    const fecha = new Date().toLocaleString("es-CL");
-    const estado = "pendiente_de_pago" as const;
+    const supabase = getSupabaseServer();
 
-    const resultadoPago = await paymentProvider.crearPago({ numero, total });
+    const { data: pedidoCreado, error: insertError } = await supabase
+      .from("pedidos")
+      .insert({
+        numero_pedido: numero,
+        estado: "pendiente_de_pago",
+        cliente_nombre: clienteNormalizado.nombre,
+        cliente_apellido: clienteNormalizado.apellido,
+        cliente_rut: clienteNormalizado.rut,
+        cliente_email: clienteNormalizado.email,
+        cliente_telefono: clienteNormalizado.telefono,
+        direccion: clienteNormalizado.direccion,
+        numero_direccion: clienteNormalizado.numero,
+        depto: clienteNormalizado.depto || null,
+        comuna: clienteNormalizado.comuna,
+        region: clienteNormalizado.region,
+        items: itemsResueltos,
+        subtotal,
+        costo_envio: COSTO_ENVIO,
+        total,
+      })
+      .select("id")
+      .single();
 
-    const filasProductos = itemsResueltos
-      .map(
-        (i) =>
-          `<tr><td>${i.nombre}</td><td>${i.cantidad}</td><td>$${i.precio.toLocaleString("es-CL")}</td><td>$${i.subtotal.toLocaleString("es-CL")}</td></tr>`
-      )
-      .join("");
-
-    if (!process.env.RESEND_API_KEY || !process.env.PEDIDO_EMAIL_DESTINO) {
-      return NextResponse.json(
-        { error: "Falta RESEND_API_KEY o PEDIDO_EMAIL_DESTINO en .env.local (¿reiniciaste el servidor después de crearlo?)" },
-        { status: 500 }
-      );
+    if (insertError || !pedidoCreado) {
+      console.error("Error guardando pedido:", insertError);
+      return NextResponse.json({ error: "No se pudo guardar el pedido." }, { status: 500 });
     }
 
-    const envio = await resend.emails.send({
-      from: "Phantom Protein <onboarding@resend.dev>",
-      to: process.env.PEDIDO_EMAIL_DESTINO as string,
-      subject: `Pedido ${numero} — ${cliente.nombre} ${cliente.apellido}`,
-      html: `
-        <h2>Nuevo pedido Phantom Protein</h2>
-        <p><strong>N° de pedido:</strong> ${numero}</p>
-        <p><strong>Fecha:</strong> ${fecha}</p>
-        <p><strong>Estado:</strong> ${ESTADO_LABEL[estado]}</p>
-        <hr />
-        <h3>Cliente</h3>
-        <p><strong>Nombre:</strong> ${cliente.nombre} ${cliente.apellido}</p>
-        <p><strong>RUT:</strong> ${cliente.rut}</p>
-        <p><strong>Email:</strong> ${cliente.email}</p>
-        <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
-        <p><strong>Dirección:</strong> ${cliente.direccion} ${cliente.numero} ${cliente.depto || ""}</p>
-        <p><strong>Comuna:</strong> ${cliente.comuna}</p>
-        <p><strong>Región:</strong> ${cliente.region}</p>
-        <hr />
-        <h3>Productos</h3>
-        <table cellpadding="6" style="border-collapse:collapse">
-          <tr><th align="left">Producto</th><th align="left">Cant.</th><th align="left">Precio</th><th align="left">Subtotal</th></tr>
-          ${filasProductos}
-        </table>
-        <p><strong>Subtotal:</strong> $${subtotal.toLocaleString("es-CL")}</p>
-        <p><strong>Envío:</strong> $${COSTO_ENVIO.toLocaleString("es-CL")}</p>
-        <p><strong>Total:</strong> $${total.toLocaleString("es-CL")}</p>
-      `,
-    });
+    try {
+      const resultadoPago = await paymentProvider.crearPago({
+        numero,
+        items: itemsResueltos,
+        subtotal,
+        costoEnvio: COSTO_ENVIO,
+        total,
+        cliente: clienteNormalizado,
+      });
 
-    if (envio.error) {
-      return NextResponse.json({ error: `Resend: ${envio.error.message}` }, { status: 500 });
+      const { error: updateError } = await supabase
+        .from("pedidos")
+        .update({
+          mercadopago_order_id: resultadoPago.orderId || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pedidoCreado.id);
+
+      if (updateError) {
+        console.error("No se pudo guardar el ID de order de Mercado Pago:", updateError);
+      }
+
+      return NextResponse.json({
+        numero,
+        redireccionar: resultadoPago.redireccionar,
+        url: resultadoPago.url ?? null,
+      });
+    } catch (error) {
+      const { error: deleteError } = await supabase
+        .from("pedidos")
+        .delete()
+        .eq("id", pedidoCreado.id);
+
+      if (deleteError) {
+        console.error("No se pudo limpiar el pedido fallido:", deleteError);
+      }
+
+      throw error;
     }
-
-    return NextResponse.json({
-      numero,
-      redireccionar: resultadoPago.redireccionar,
-      url: resultadoPago.url ?? null,
-    });
   } catch (error) {
     console.error(error);
-    const mensaje = error instanceof Error ? error.message : "Error desconocido";
+    const mensaje = error instanceof Error ? error.message : "Error desconocido.";
     return NextResponse.json({ error: mensaje }, { status: 500 });
   }
 }
