@@ -1,220 +1,108 @@
-"use client";
-
 import Image from "next/image";
-import { useRef, useState } from "react";
-import { productos } from "@/lib/productos";
-import { useCarrito } from "@/lib/carrito-context";
+import Link from "next/link";
+import { catalogoProductos, getProducto } from "@/lib/catalogo";
+import AgregarCarritoBoton from "@/components/agregar-carrito-boton";
 
-const dorado =
-  "bg-gradient-to-r from-[#BF953F] via-[#FCF6BA] via-[#B38728] via-[#FBF5B7] to-[#AA771C] bg-clip-text text-transparent";
+type Props = { titulo?: string; excluirSlug?: string; compacto?: boolean };
 
-export default function Productos() {
-  const [activo, setActivo] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-  const [rotateX, setRotateX] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [interactuo, setInteractuo] = useState(false);
-  const [agregado, setAgregado] = useState(false);
+type TarjetaProducto = {
+  key: string;
+  slug: string;
+  nombre: string;
+  imagen: string;
+  precio: number;
+  productoId: string;
+  esProteina: boolean;
+  esNuevo: boolean;
+};
 
-  const startX = useRef(0);
-  const startRotate = useRef(0);
-  const producto = productos[activo];
-  const { agregar } = useCarrito();
+function precioCLP(value: number) {
+  return `$${value.toLocaleString("es-CL")}`;
+}
 
-  function cambiar(delta: number) {
-    setActivo((prev) => (prev + delta + productos.length) % productos.length);
-  }
+/**
+ * El catálogo muestra cuatro presentaciones comprables.
+ * Vainilla y chocolate comparten una única ficha de proteína, con el sabor
+ * precargado por URL; sus IDs individuales se mantienen para carrito/checkout.
+ */
+function obtenerTarjetas(excluirSlug?: string): TarjetaProducto[] {
+  return catalogoProductos.flatMap((grupo) => {
+    if (grupo.slug === excluirSlug) return [];
 
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    setDragging(true);
-    setInteractuo(true);
-    startX.current = e.clientX;
-    startRotate.current = rotateY;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }
+    return grupo.productoIds.flatMap((id) => {
+      const producto = getProducto(id);
+      if (!producto) return [];
 
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (dragging) {
-      const delta = e.clientX - startX.current;
-      setRotateY(Math.max(-50, Math.min(50, startRotate.current + delta * 0.5)));
-    } else {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const px = (e.clientX - rect.left) / rect.width - 0.5;
-      const py = (e.clientY - rect.top) / rect.height - 0.5;
-      setRotateX(py * -10);
-      setRotateY(px * 10);
-    }
-  }
+      const nombre = id === "proteina-vainilla"
+        ? "Proteína Vainilla 1,5 kg"
+        : id === "proteina-chocolate"
+          ? "Proteína Chocolate 1,5 kg"
+          : producto.nombre;
 
-  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
+      return [{
+        key: id,
+        slug: grupo.slug,
+        nombre,
+        imagen: producto.imagen,
+        precio: producto.precio,
+        productoId: producto.id,
+        esProteina: grupo.slug === "proteina",
+        esNuevo: grupo.slug !== "proteina",
+      }];
+    });
+  });
+}
 
-    const delta = e.clientX - startX.current;
-
-    if (Math.abs(delta) > 70) {
-      cambiar(delta < 0 ? 1 : -1);
-    }
-
-    setDragging(false);
-    setRotateY(0);
-    setRotateX(0);
-  }
-
-  function onPointerLeave() {
-    if (dragging) setDragging(false);
-    setRotateY(0);
-    setRotateX(0);
-  }
-
-  function agregarAlCarrito() {
-    agregar(producto, 1);
-    setAgregado(true);
-    setTimeout(() => setAgregado(false), 1500);
-  }
+export default function Productos({ titulo = "NUESTROS PRODUCTOS", excluirSlug, compacto = false }: Props) {
+  const lista = obtenerTarjetas(excluirSlug);
+  const Heading = compacto ? "h2" : "h1";
 
   return (
-    <section
-      id="productos"
-      className="relative overflow-hidden bg-black py-14 sm:py-24"
-    >
-      <style>{`
-        @keyframes phantomFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-12px); }
-        }
-        @keyframes phantomIn {
-          from { opacity: 0; transform: scale(0.9) translateY(14px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .phantom-float { animation: phantomFloat 4.5s ease-in-out infinite; }
-        .phantom-in { animation: phantomIn 0.45s ease-out; }
-      `}</style>
-
-      <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        <div data-aos="fade-up" className="mb-10 text-center sm:mb-16">
-          <span className="mb-3 hidden rounded-full border border-[#D4AF37]/30 bg-white/5 px-3 py-1.5 text-[11px] tracking-widest text-white sm:mb-4 sm:px-4 sm:py-2 sm:text-sm md:inline-block">
-            CATÁLOGO
-          </span>
-
-          <h2 className="text-3xl text-white sm:text-4xl md:text-5xl [font-family:var(--font-anton)]">
-            NUESTROS <span className={dorado}>PRODUCTOS</span>
-          </h2>
+    <section id="productos" className={`relative bg-black text-white ${compacto ? "py-12 sm:py-16" : "py-14 sm:py-20 lg:py-24"}`}>
+      <div className="mx-auto max-w-[1320px] px-4 sm:px-8 lg:px-12">
+        <div className="mb-8 text-center sm:mb-12">
+          <p className="mb-3 text-[9px] font-medium tracking-[0.28em] text-[#EBD6A8]/80">PHANTOM PROTEIN</p>
+          <Heading className="text-2xl font-bold uppercase tracking-[-0.03em] text-[#F5F3EE] sm:text-3xl md:text-4xl">{titulo}</Heading>
         </div>
 
-        <div
-          data-aos="fade-up"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerLeave}
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowRight") cambiar(1);
-            if (e.key === "ArrowLeft") cambiar(-1);
-          }}
-          className="relative mb-2 flex h-[270px] cursor-grab touch-none select-none items-center justify-center rounded-3xl outline-none [perspective:1200px] sm:mb-4 sm:h-[340px] md:h-[420px]"
-        >
-          <div className="absolute h-56 w-56 rounded-full bg-[#D4AF37]/10 blur-[80px] sm:h-72 sm:w-72 sm:blur-[100px]" />
+        <div className={`grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 ${compacto ? "md:grid-cols-3 lg:grid-cols-3" : "md:grid-cols-4"}`}>
+          {lista.map((item) => {
+            const href = item.esProteina
+              ? `/productos/proteina?variante=${encodeURIComponent(item.productoId)}`
+              : `/productos/${item.slug}`;
 
-          <button
-            onClick={() => cambiar(-1)}
-            aria-label="Producto anterior"
-            className="absolute left-0 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:border-[#D4AF37] hover:text-[#D4AF37] sm:left-2 sm:h-10 sm:w-10 md:left-4"
-          >
-            ‹
-          </button>
-
-          <button
-            onClick={() => cambiar(1)}
-            aria-label="Siguiente producto"
-            className="absolute right-0 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:border-[#D4AF37] hover:text-[#D4AF37] sm:right-2 sm:h-10 sm:w-10 md:right-4"
-          >
-            ›
-          </button>
-
-          <div className="phantom-float relative z-10 h-full w-full">
-            <div
-              key={activo}
-              style={{
-                transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-                transition: dragging ? "none" : "transform 0.4s ease-out",
-              }}
-              className="phantom-in relative h-full w-full [transform-style:preserve-3d]"
-            >
-              <Image
-                src={producto.imagen}
-                alt={`Phantom ${producto.nombre}`}
-                fill
-                sizes="(max-width: 640px) 240px, (max-width: 768px) 280px, 400px"
-                className="object-contain drop-shadow-[0_0_50px_rgba(212,175,55,0.15)]"
-                priority
-              />
-            </div>
-          </div>
-
-          {!interactuo && (
-            <span className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 text-[11px] tracking-wide text-gray-500 sm:bottom-2 sm:text-xs">
-              Arrastra para girar
-            </span>
-          )}
+            return (
+              <article key={item.key} className="group flex min-w-0 flex-col">
+                <Link href={href} aria-label={`Ver ${item.nombre}`} className="relative block overflow-hidden bg-[#050505] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#EBD6A8]">
+                  {item.esNuevo && <span className="absolute left-2 top-2 z-10 bg-[#EBD6A8] px-2 py-1 text-[7px] tracking-[0.16em] text-[#16140F] sm:left-3 sm:top-3 sm:px-3 sm:text-[8px]">NUEVO</span>}
+                  <div className="relative h-[170px] sm:h-[225px] md:h-[245px] lg:h-[280px]">
+                    <Image src={item.imagen} alt={item.nombre} fill quality={92} sizes="(max-width: 639px) 45vw, (max-width: 1023px) 42vw, 300px" className="object-contain p-3 transition duration-500 ease-out group-hover:scale-[1.045] sm:p-5" />
+                  </div>
+                </Link>
+                <div className="mt-3 flex flex-1 flex-col px-0.5 sm:px-1">
+                  <Link href={href} className="text-[10px] leading-4 text-white/90 transition hover:text-[#EBD6A8] sm:text-[12px] sm:leading-5">{item.nombre}</Link>
+                  <p className="mt-1 text-[11px] font-semibold text-[#F2E8D3] sm:text-[12px]">{precioCLP(item.precio)}</p>
+                  {item.esProteina && <p className="mt-1 text-[9px] text-white/45 sm:text-[10px]">25 g de proteína por porción</p>}
+                  <div className="mt-auto pt-3 sm:pt-4">
+                    {item.esProteina ? (
+                      <Link href={href} className="flex min-h-9 items-center justify-center rounded-full border border-white/25 px-2 py-2 text-center text-[8px] font-semibold tracking-[0.1em] text-white transition hover:border-[#EBD6A8] hover:bg-[#EBD6A8] hover:text-black sm:min-h-10 sm:px-4 sm:text-[9px] sm:tracking-[0.16em]">ELEGIR SABOR</Link>
+                    ) : (
+                      <div className="[&>button]:min-h-9 [&>button]:px-2 [&>button]:text-[8px] sm:[&>button]:min-h-10 sm:[&>button]:px-4 sm:[&>button]:text-[9px]">
+                        <AgregarCarritoBoton producto={getProducto(item.productoId)!} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
 
-        <div
-          key={`info-${activo}`}
-          className="phantom-in mb-6 text-center sm:mb-8"
-        >
-          <span
-            className={`mb-1.5 block text-[11px] font-semibold uppercase tracking-wider sm:mb-2 sm:text-xs ${dorado}`}
-          >
-            {producto.categoria}
-          </span>
-
-          <h3 className="mb-1 text-2xl text-white sm:text-3xl [font-family:var(--font-anton)]">
-            {producto.nombre}
-          </h3>
-
-          <p
-            className={`mb-3 text-base font-semibold sm:mb-4 sm:text-lg ${dorado}`}
-          >
-            ${producto.precio.toLocaleString("es-CL")}
-          </p>
-
-          <ul className="mb-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-gray-400 sm:mb-6 sm:gap-x-6 sm:text-sm">
-            {producto.detalles.map((d) => (
-              <li key={d}>{d}</li>
-            ))}
-          </ul>
-
-          <button
-            onClick={agregarAlCarrito}
-            className="rounded-full bg-white px-7 py-3 text-sm font-semibold text-black transition hover:scale-105 hover:bg-gray-200 sm:px-8 sm:text-base"
-          >
-            {agregado ? "Añadido ✓" : "Agregar al carrito"}
-          </button>
-        </div>
-
-        <div className="flex justify-center gap-3 overflow-x-auto pb-1 sm:gap-4 sm:pb-2">
-          {productos.map((p, i) => (
-            <button
-              key={p.nombre}
-              onClick={() => setActivo(i)}
-              aria-label={`Ver ${p.nombre}`}
-              className={`group flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border p-2.5 transition-all duration-300 sm:h-24 sm:w-24 sm:p-3 ${
-                i === activo
-                  ? "scale-105 border-[#D4AF37] bg-white/5 shadow-[0_0_20px_rgba(212,175,55,0.25)]"
-                  : "border-white/10 bg-white/[0.02] hover:border-white/30"
-              }`}
-            >
-              <Image
-                src={p.imagen}
-                alt=""
-                width={60}
-                height={60}
-                className="h-full w-full object-contain opacity-80 transition group-hover:opacity-100"
-              />
-            </button>
-          ))}
-        </div>
+        {!compacto && <div className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 border-t border-white/10 pt-7 text-[8px] tracking-wide text-white/55 sm:mt-14 sm:gap-x-10 sm:text-[10px]">
+          <span className="flex items-center gap-2"><span className="text-[#EBD6A8]">△</span> Alto valor biológico</span>
+          <span className="flex items-center gap-2"><span className="text-[#EBD6A8]">⊘</span> Sin azúcar añadida</span>
+          <span className="flex items-center gap-2"><span className="text-[#EBD6A8]">◇</span> Rendimiento real</span>
+        </div>}
       </div>
     </section>
   );

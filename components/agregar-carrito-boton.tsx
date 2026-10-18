@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Producto } from "@/lib/productos";
+import type { Producto } from "@/lib/productos";
 import { useCarrito } from "@/lib/carrito-context";
 
 export default function AgregarCarritoBoton({ producto }: { producto: Producto }) {
@@ -11,15 +11,12 @@ export default function AgregarCarritoBoton({ producto }: { producto: Producto }
   function onClick() {
     agregar(producto, 1);
     setAgregado(true);
-    setTimeout(() => setAgregado(false), 1500);
+    window.setTimeout(() => setAgregado(false), 1500);
   }
 
   return (
-    <button
-      onClick={onClick}
-      className="mt-auto rounded-full bg-white px-6 py-3 font-semibold text-black transition hover:scale-105 hover:bg-gray-200"
-    >
-      {agregado ? "Añadido ✓" : "Agregar al carrito"}
+    <button type="button" onClick={onClick} className="flex min-h-10 w-full items-center justify-center rounded-full border border-white/25 px-4 py-3 text-center text-[9px] font-semibold tracking-[0.16em] text-white transition hover:border-[#EBD6A8] hover:bg-[#EBD6A8] hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#EBD6A8]">
+      {agregado ? "AÑADIDO ✓" : "AÑADIR AL CARRITO"}
     </button>
   );
 }

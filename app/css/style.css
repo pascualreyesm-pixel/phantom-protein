@@ -205,3 +205,19 @@
     border-color: var(--color-gray-200, currentColor);
   }
 }
+
+/* Phantom Protein: ticker de la sección Conocer la línea. */
+@keyframes phantom-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.phantom-marquee-track {
+  animation: phantom-marquee 30s linear infinite;
+}
+.phantom-marquee-track:hover {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .phantom-marquee-track { animation: none; }
+  html { scroll-behavior: auto; }
+}
