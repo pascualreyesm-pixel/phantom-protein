@@ -45,8 +45,17 @@ function firmaValida({
   secret: string;
 }) {
   const parsed = parseSignature(xSignature);
-  if (!parsed || !xRequestId || !dataId) return false;
-  const manifest = `id:${dataId.toLowerCase()};request-id:${xRequestId};ts:${parsed.ts};`;
+  if (!parsed) return false;
+
+  // Mercado Pago indica que cada par del manifest se agrega solo cuando
+  // el dato correspondiente está presente. x-request-id puede faltar en
+  // algunas notificaciones/simulaciones; no debemos rechazarlo por eso.
+  const manifestParts: string[] = [];
+  if (dataId) manifestParts.push(`id:${dataId.toLowerCase()};`);
+  if (xRequestId) manifestParts.push(`request-id:${xRequestId};`);
+  manifestParts.push(`ts:${parsed.ts};`);
+  const manifest = manifestParts.join("");
+
   const expected = createHmac("sha256", secret.trim()).update(manifest).digest("hex");
   const expectedBuffer = Buffer.from(expected, "utf8");
   const receivedBuffer = Buffer.from(parsed.v1, "utf8");
