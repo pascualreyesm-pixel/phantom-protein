@@ -1,0 +1,16 @@
+PHANTOM PROTEIN - ARCHIVOS CORREGIDOS PARA REEMPLAZAR
+
+Reemplaza estos dos archivos en tu proyecto, respetando las carpetas:
+1) lib/payment/mercadopago-provider.ts
+2) app/api/webhooks/mercadopago/route.ts
+
+Esta versión usa Checkout Pro + Preferences API y procesa notificaciones de pagos (/v1/payments/{id}), en lugar de la API de Orders.
+
+ANTES DE PROBAR:
+- En Vercel, MERCADOPAGO_ACCESS_TOKEN debe ser el Access Token de PRODUCCIÓN para el entorno Production. Para Preview/test usa credenciales de prueba por separado.
+- MERCADOPAGO_WEBHOOK_SECRET debe ser el secreto de firma correspondiente al webhook configurado para ese mismo entorno. No mezcles secreto de prueba con credenciales de producción.
+- En Mercado Pago Developers, configura la URL https://phantomprotein.cl/api/webhooks/mercadopago y selecciona el evento de pagos (Payments / Pagos), no solamente Order.
+- Después de reemplazar, sube los cambios a GitHub y espera el deploy de Vercel.
+- Primero prueba con credenciales de prueba; no hagas un cobro real para diagnosticar el 403.
+
+No contiene .env.local ni credenciales.

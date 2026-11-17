@@ -1,0 +1,30 @@
+PHANTOM PROTEIN — ACTUALIZACIÓN DE AUDITORÍA DE PAGOS
+
+Esta actualización contiene:
+- URLs de retorno y webhook normalizadas al dominio canónico https://www.phantomprotein.cl para evitar el 308 del dominio sin www.
+- Webhook Checkout Pro para tópico payment, con validación HMAC, registro de diagnóstico sin imprimir secretos y protección contra retroceso de estado.
+- Endpoint de consulta de estado del pedido; la página de retorno ya no confía en el parámetro status de la URL para mostrar un pago aprobado.
+- Endpoint protegido para enviar un correo de prueba de Resend.
+
+ANTES DE SUBIR:
+1. No incluyas ni reemplaces tu .env.local.
+2. En Vercel, confirma NEXT_PUBLIC_URL=https://www.phantomprotein.cl en Production.
+3. Confirma MERCADOPAGO_ACCESS_TOKEN y MERCADOPAGO_WEBHOOK_SECRET en Production.
+4. Crea una variable EMAIL_TEST_TOKEN en Vercel (Production) con una cadena aleatoria larga. Ejemplo: genera dos GUID en PowerShell y concaténalos:
+   ([guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N'))
+5. Confirma PEDIDO_EMAIL_DESTINO=phantomproteinchile@gmail.com en Production.
+6. Confirma RESEND_API_KEY en Production y que RESEND_FROM_EMAIL sea un remitente autorizado por Resend. onboarding@resend.dev solo sirve bajo las restricciones de prueba de Resend; para producción verifica phantomprotein.cl en Resend y usa una dirección de ese dominio.
+7. Sube los cambios y espera el deployment Ready.
+
+PRUEBA DE CORREO (sin compra ni cobro):
+En PowerShell, reemplaza TOKEN_GENERADO por el valor de EMAIL_TEST_TOKEN que creaste en Vercel:
+
+curl.exe -sS -X POST "https://www.phantomprotein.cl/api/admin/test-email" -H "x-email-test-token: TOKEN_GENERADO"
+
+La respuesta {"ok":true,...} significa que Resend aceptó el envío. Confirma que el mensaje llegue a phantomproteinchile@gmail.com (revisa spam/promociones). Si Resend devuelve error de dominio/remitente, verifica el dominio en Resend y configura RESEND_FROM_EMAIL con una dirección autorizada.
+
+IMPORTANTE:
+- El test de correo no crea pedidos ni realiza pagos.
+- La simulación de webhook de Mercado Pago debe incluir una firma válida. Un POST manual sin x-signature/x-request-id debe ser rechazado con 401; eso es lo correcto desde el punto de vista de seguridad.
+- No habilites pagos reales hasta que la notificación de pago real/prueba de Mercado Pago actualice Supabase y el correo llegue correctamente.
+- Las claves privadas que se mostraron en capturas deben rotarse y actualizarse en Vercel antes de operar en producción.

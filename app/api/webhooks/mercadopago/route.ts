@@ -9,6 +9,7 @@ type NotificacionMercadoPago = {
   id?: string | number;
   type?: string;
   action?: string;
+  live_mode?: boolean;
   data?: { id?: string | number };
 };
 
@@ -46,7 +47,7 @@ function firmaValida({
   const parsed = parseSignature(xSignature);
   if (!parsed || !xRequestId || !dataId) return false;
   const manifest = `id:${dataId.toLowerCase()};request-id:${xRequestId};ts:${parsed.ts};`;
-  const expected = createHmac("sha256", secret).update(manifest).digest("hex");
+  const expected = createHmac("sha256", secret.trim()).update(manifest).digest("hex");
   const expectedBuffer = Buffer.from(expected, "utf8");
   const receivedBuffer = Buffer.from(parsed.v1, "utf8");
   if (expectedBuffer.length !== receivedBuffer.length) return false;
@@ -80,16 +81,31 @@ export async function POST(request: NextRequest) {
     const queryType = url.searchParams.get("type");
     const body = (await request.json().catch(() => ({}))) as NotificacionMercadoPago;
     const dataId = queryDataId || (body.data?.id != null ? String(body.data.id) : null);
-    const type = body.type || queryType;
+    const type = body.type || queryType || (body.action?.startsWith("payment.") ? "payment" : null);
 
-    // Checkout Pro notifica los pagos con type="payment".
+    // Checkout Pro (Preferences API) notifica los pagos con type="payment".
     if (type && type !== "payment") return NextResponse.json({ received: true });
     if (!dataId) return NextResponse.json({ received: true });
 
     const requestId = request.headers.get("x-request-id");
     const signature = request.headers.get("x-signature");
     if (!firmaValida({ xSignature: signature, xRequestId: requestId, dataId, secret: webhookSecret })) {
+      // No registrar la firma ni el secreto. Estos datos permiten diagnosticar
+      // una configuración antigua o encabezados ausentes sin filtrar credenciales.
+      console.warn("Webhook Mercado Pago rechazado: firma inválida o encabezados incompletos.", {
+        hasSignature: Boolean(signature),
+        hasRequestId: Boolean(requestId),
+        hasDataId: Boolean(dataId),
+        hasSecret: Boolean(webhookSecret.trim()),
+        dataIdFromQuery: Boolean(queryDataId),
+      });
       return NextResponse.json({ error: "Firma inválida." }, { status: 401 });
+    }
+
+    // El simulador de Mercado Pago usa live_mode=false y un ID ficticio.
+    // Tras validar la firma, se confirma la recepción sin consultar ni alterar pedidos.
+    if (body.live_mode === false) {
+      return NextResponse.json({ received: true, simulation: true });
     }
 
     const pago = await obtenerPago(dataId);
@@ -116,17 +132,19 @@ export async function POST(request: NextRequest) {
     }
 
     const estaAprobado = pago.status === "approved";
+    const yaEstaPagado = pedido.estado === "pagado" || Boolean(pedido.pagado_at);
     const ahora = new Date().toISOString();
     const { error: updateError } = await supabase.from("pedidos").update({
       mercadopago_payment_id: String(pago.id || dataId),
-      mercadopago_status: pago.status || null,
-      mercadopago_status_detail: pago.status_detail || null,
-      estado: estaAprobado ? "pagado" : pedido.estado,
-      pagado_at: estaAprobado ? pedido.pagado_at || ahora : pedido.pagado_at,
+      // Una notificación tardía no debe hacer retroceder un pedido pagado.
+      mercadopago_status: yaEstaPagado ? "approved" : (pago.status || null),
+      mercadopago_status_detail: yaEstaPagado ? (pedido.mercadopago_status_detail || "accredited") : (pago.status_detail || null),
+      estado: (estaAprobado || yaEstaPagado) ? "pagado" : pedido.estado,
+      pagado_at: (estaAprobado || yaEstaPagado) ? pedido.pagado_at || ahora : pedido.pagado_at,
       updated_at: ahora,
     }).eq("id", pedido.id);
     if (updateError) throw updateError;
-    if (!estaAprobado) return NextResponse.json({ received: true });
+    if (!estaAprobado && !yaEstaPagado) return NextResponse.json({ received: true });
 
     const { data: pedidoActualizado, error: fetchError } = await supabase
       .from("pedidos").select("*").eq("id", pedido.id).single();

@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { PaymentProvider, OrdenPago, ResultadoPago } from "./types";
 
 function normalizarBaseUrl(url: string) {
-  return url.replace(/\/+$/, "");
+  const parsed = new URL(url);
+  // El dominio apex redirige a www en Vercel. Mercado Pago debe recibir
+  // directamente la URL canónica para evitar respuestas 308 en el webhook.
+  if (parsed.hostname === "phantomprotein.cl") parsed.hostname = "www.phantomprotein.cl";
+  return parsed.toString().replace(/\/+$/, "");
 }
 
 export const mercadoPagoProvider: PaymentProvider = {
@@ -15,7 +19,12 @@ export const mercadoPagoProvider: PaymentProvider = {
     if (!token) throw new Error("Falta MERCADOPAGO_ACCESS_TOKEN en las variables de entorno.");
     if (!baseUrlRaw) throw new Error("Falta NEXT_PUBLIC_URL en las variables de entorno.");
 
-    const baseUrl = normalizarBaseUrl(baseUrlRaw);
+    let baseUrl: string;
+    try {
+      baseUrl = normalizarBaseUrl(baseUrlRaw);
+    } catch {
+      throw new Error("NEXT_PUBLIC_URL debe ser una URL HTTPS pública válida.");
+    }
     if (!/^https:\/\//i.test(baseUrl)) {
       throw new Error("NEXT_PUBLIC_URL debe ser una URL HTTPS pública para Mercado Pago.");
     }
