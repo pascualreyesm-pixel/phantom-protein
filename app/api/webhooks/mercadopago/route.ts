@@ -96,19 +96,27 @@ export async function POST(request: NextRequest) {
     if (type && type !== "payment") return NextResponse.json({ received: true });
     if (!dataId) return NextResponse.json({ received: true });
 
-    // Las simulaciones de Mercado Pago llevan live_mode=false y usan IDs ficticios.
-    // Se responde 200 sin validar firma, consultar pagos ni modificar pedidos:
-    // este camino solo confirma que el endpoint recibe la simulación.
-    if (body.live_mode === false) {
+    const requestId = request.headers.get("x-request-id");
+    const signature = request.headers.get("x-signature");
+    const firmaOk = firmaValida({
+      xSignature: signature,
+      xRequestId: requestId,
+      dataId,
+      secret: webhookSecret,
+    });
+
+    // El simulador oficial de Mercado Pago envía live_mode=false y un Data ID
+    // ficticio (123456). Se confirma su recepción sin consultar un pago ni
+    // alterar pedidos. Las compras sandbox reales también llevan live_mode=false,
+    // pero deben tener firma válida para continuar y actualizar Supabase.
+    if (body.live_mode === false && dataId === "123456" && !firmaOk) {
       return NextResponse.json({ received: true, simulation: true });
     }
 
-    const requestId = request.headers.get("x-request-id");
-    const signature = request.headers.get("x-signature");
-    if (!firmaValida({ xSignature: signature, xRequestId: requestId, dataId, secret: webhookSecret })) {
-      // No registrar la firma ni el secreto. Estos datos permiten diagnosticar
-      // una configuración antigua o encabezados ausentes sin filtrar credenciales.
+    // Para pagos reales y compras sandbox exigimos siempre la firma HMAC.
+    if (!firmaOk) {
       console.warn("Webhook Mercado Pago rechazado: firma inválida o encabezados incompletos.", {
+        liveMode: body.live_mode,
         hasSignature: Boolean(signature),
         hasRequestId: Boolean(requestId),
         hasDataId: Boolean(dataId),
