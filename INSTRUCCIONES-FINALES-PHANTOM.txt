@@ -1,0 +1,74 @@
+PHANTOM PROTEIN — ENTREGA ACTUALIZADA
+====================================
+
+INCLUYE
+- Barra de anuncio dorada bajo el logo y la navegación: BLACKPHANTOM15.
+- Campaña Black Friday adelantado.
+- Cupón BLACKPHANTOM15: 15% en productos elegibles; se excluyen creatina y packs. El servidor recalcula y valida el descuento. El envío no recibe descuento.
+- Pack Proteína Vainilla o Chocolate 1,5 kg + Creatina 100% monohidratada 300 g: $69.300. No acumula cupón.
+- Ingredientes desplegables en cada ficha de producto.
+- Retiro del sello FDA independiente de la sección de marca; se conserva HACCP. Las fotos originales de los envases no se modifican.
+- Ocho comentarios anónimos basados en opiniones que el dueño indicó haber recibido. No se inventan nombres, estrellas ni compras verificadas.
+- Botón CONOCE NUESTROS PACKS en la diapositiva de los modelos.
+- Carrusel principal con gesto de deslizar en celular.
+- Checkout Pro con Preferences API, validación de monto/moneda, verificación HMAC de webhooks y reconciliación segura del pago al volver desde Mercado Pago.
+- Correos de pedidos a phantomproteinchile@gmail.com. En Preview el correo y el pedido se marcan PRUEBA SANDBOX / PH-TEST para evitar confundirlos con ventas reales.
+
+ORDEN PARA INSTALAR
+1. Descomprime el ZIP.
+2. Copia su contenido dentro de tu carpeta local phantom-protein-new y acepta reemplazar. Conserva tu carpeta .git y tu archivo .env.local: no vienen incluidos en este ZIP.
+3. En Supabase > SQL Editor, ejecuta una sola vez:
+   supabase/migrations/20261117_promociones_y_confirmacion_segura.sql
+   La migración agrega los campos de descuento y token de confirmación que requiere el checkout.
+4. Estás trabajando en la rama prueba-pagos. Desde PowerShell en phantom-protein-new ejecuta:
+   git status
+   git add .
+   git commit -m "Actualiza tienda, promociones y flujo de pagos"
+   git push
+   Si Git dice que no hay cambios para commit, no repitas el commit; revisa el despliegue de Preview.
+5. En Vercel, espera el deployment Preview de la rama prueba-pagos en estado Ready. Abre el dominio .vercel.app del último deployment, no phantomprotein.cl.
+
+VARIABLES DE VERCEL
+PRODUCTION:
+- MERCADOPAGO_ACCESS_TOKEN: Access Token de producción de la aplicación Phantom Protein.
+- MERCADOPAGO_WEBHOOK_SECRET: firma secreta de Webhooks en Modo productivo.
+- NEXT_PUBLIC_URL: https://www.phantomprotein.cl
+- NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SECRET_KEY: proyecto Supabase de Phantom Protein.
+- RESEND_API_KEY: API key de Resend.
+- PEDIDO_EMAIL_DESTINO: phantomproteinchile@gmail.com
+- RESEND_FROM_EMAIL: Phantom Protein <pedidos@phantomprotein.cl>
+- EMAIL_TEST_TOKEN: token aleatorio privado para la ruta de prueba de correo.
+
+PREVIEW:
+- MERCADOPAGO_ACCESS_TOKEN: Access Token APP_USR de credenciales de prueba (solo Preview; nunca lo pongas en Production).
+- SUPABASE_SECRET_KEY, NEXT_PUBLIC_SUPABASE_URL, RESEND_API_KEY, PEDIDO_EMAIL_DESTINO y RESEND_FROM_EMAIL deben estar disponibles también en Preview para probar la escritura y el correo.
+- El proveedor usa automáticamente VERCEL_URL en Preview para los back_urls y notification_url; no necesita apuntar a NEXT_PUBLIC_URL de producción.
+- No reemplaces el Access Token ni el secreto de Production por los de prueba.
+
+PRUEBA SANDBOX (SIN COBRO REAL)
+1. Abre el último Preview Ready de Vercel.
+2. Agrega productos al carrito y realiza el checkout usando una cuenta COMPRADORA de prueba de Mercado Pago y una tarjeta de prueba de Chile. No uses tu cuenta ni tarjeta personales.
+3. Mercado Pago devuelve payment_id a la URL de retorno. El servidor consulta ese pago usando el Access Token del entorno Preview y valida que external_reference, monto y moneda coincidan antes de marcar el pedido como pagado.
+4. Revisa Supabase > public.pedidos: el pedido de Preview empieza por PH-TEST y debe terminar con estado=pagado, mercadopago_status=approved, mercadopago_payment_id y pagado_at informados, y email_enviado_at informado.
+5. Revisa phantomproteinchile@gmail.com. El asunto debe comenzar por [PRUEBA SANDBOX] y el mensaje advierte que no se debe despachar.
+6. El Preview reutiliza la misma base Supabase y el mismo buzón Resend configurados para el proyecto, por lo que el pedido y el correo sandbox aparecerán allí marcados como PRUEBA. Después de comprobarlo, elimina el registro de prueba o cámbialo a cancelado; no despaches productos.
+
+IMPORTANTE SOBRE WEBHOOKS Y SANDBOX
+La documentación de Mercado Pago indica que los pagos creados con credenciales de prueba no envían notificaciones webhook reales. Por eso el checkout de Preview confirma el pago consultándolo directamente a la API cuando el comprador vuelve a la tienda. El botón “Simular notificación” solo verifica que la URL responde; un 200 OK de esa simulación no equivale a un pago aprobado.
+En Production se mantiene el webhook firmado de pagos: URL https://www.phantomprotein.cl/api/webhooks/mercadopago, evento Pagos (legacy), y firma secreta de Modo productivo. El webhook consulta /v1/payments/{id} y valida estado, external_reference, monto y CLP antes de marcar pagado y enviar el correo.
+
+PASAR A PRODUCCIÓN DESPUÉS DE LA PRUEBA
+Cuando el pedido PH-TEST aparezca pagado en Supabase y llegue el correo de prueba:
+1. Integra la rama prueba-pagos a main (preferentemente mediante Pull Request en GitHub), o desde PowerShell:
+   git switch main
+   git pull origin main
+   git merge prueba-pagos
+   git push origin main
+2. Espera el deployment Production Ready.
+3. Verifica que Production siga usando exclusivamente las credenciales y la firma de producción, y que NEXT_PUBLIC_URL sea https://www.phantomprotein.cl.
+4. No habilites compras reales hasta verificar el pedido sandbox y correo. El cobro real solo ocurrirá cuando un comprador real pague en Checkout Pro.
+
+SEGURIDAD
+- El ZIP no contiene .env.local, .git, node_modules ni credenciales.
+- Como anteriormente se compartieron capturas donde aparecían claves y una contraseña de cuenta de prueba, rota las credenciales expuestas antes del lanzamiento y actualiza los valores nuevos en Vercel. Nunca pegues tokens o secretos en el chat.
+- Confirma la tarifa de envío en lib/productos.ts antes de vender: COSTO_ENVIO sigue en $3.990 CLP.

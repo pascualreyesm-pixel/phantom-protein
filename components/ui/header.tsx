@@ -38,9 +38,6 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-black text-white">
-      <div className="flex h-[28px] items-center justify-center bg-[#EBD6A8] px-3 text-center text-[8px] font-semibold tracking-[0.2em] text-[#27231C] sm:h-[31px] sm:text-[10px] sm:tracking-[0.25em]">
-        ENVÍOS A TODO CHILE <span className="mx-2">·</span> SIN AZÚCAR AÑADIDA <span className="mx-2">·</span> SIN SELLOS
-      </div>
       <div className="border-b border-white/10 bg-black">
         <div className="mx-auto flex h-[68px] max-w-[1600px] items-center justify-between px-4 sm:h-[76px] sm:px-8 lg:px-12">
           <Logo />
@@ -79,6 +76,9 @@ export default function Header() {
           </div>
         </div>
       </div>
+      <Link href="/checkout" className="flex min-h-[34px] items-center justify-center gap-2 bg-[#EBD6A8] px-3 py-2 text-center text-[8px] font-bold tracking-[0.12em] text-[#211D15] transition hover:bg-[#F5E7C7] sm:min-h-[38px] sm:text-[10px] sm:tracking-[0.18em]">
+        <span>15% OFF</span><span aria-hidden="true">·</span><span>BLACKPHANTOM15</span><span className="hidden sm:inline">· EXCEPTO CREATINA Y PACKS</span>
+      </Link>
 
       {searchOpen && <div className="absolute left-0 right-0 top-full z-40 border-b border-white/10 bg-[#080808] px-4 py-5 shadow-2xl sm:px-8"><div className="mx-auto max-w-3xl"><label htmlFor="phantom-search" className="mb-2 block text-[10px] tracking-[0.2em] text-white/50">BUSCAR EN PHANTOM PROTEIN</label><input id="phantom-search" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Busca proteína, creatina, colágeno..." className="w-full border-0 border-b border-white/25 bg-transparent px-0 py-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#EBD6A8] focus:ring-0" /><div className="mt-3 grid gap-1 sm:grid-cols-3">{resultados.map((p) => <Link key={p.slug} href={`/productos/${p.slug}`} onClick={closePanels} className="px-3 py-3 text-xs text-white/75 transition hover:bg-white/5 hover:text-[#EBD6A8]">{p.nombre}<span className="mt-1 block text-[10px] text-white/40">{p.etiqueta}</span></Link>)}{resultados.length === 0 && <p className="py-4 text-xs text-white/50">No encontramos productos con ese término.</p>}</div></div></div>}
 

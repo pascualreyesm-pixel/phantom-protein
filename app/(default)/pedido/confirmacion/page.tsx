@@ -1,102 +1,113 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCarrito } from "@/lib/carrito-context";
 
-type EstadoPedido = {
-  numero: string;
-  estado: string;
-  pago: string | null;
-  aprobado: boolean;
-};
+type EstadoVista = "consultando" | "pagado" | "pendiente" | "rechazado" | "error";
 
 function ConfirmacionContenido() {
   const searchParams = useSearchParams();
   const { vaciar } = useCarrito();
+  const vaciarRef = useRef(vaciar);
+  vaciarRef.current = vaciar;
   const numero = searchParams.get("numero") || "";
-  const [estado, setEstado] = useState<EstadoPedido | null>(null);
-  const [consultando, setConsultando] = useState(true);
-  const [error, setError] = useState(false);
+  const token = searchParams.get("token") || "";
+  const paymentId = searchParams.get("payment_id") || searchParams.get("collection_id") || "";
+  const [estado, setEstado] = useState<EstadoVista>("consultando");
 
   useEffect(() => {
-    if (!numero) {
-      setConsultando(false);
-      setError(true);
+    if (!numero || !token) {
+      setEstado("error");
       return;
     }
-
     let activo = true;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     let intentos = 0;
-    let timer: ReturnType<typeof setInterval> | undefined;
 
     const consultar = async () => {
+      intentos += 1;
       try {
-        const response = await fetch(`/api/pedido/estado?numero=${encodeURIComponent(numero)}`, { cache: "no-store" });
-        if (!response.ok) throw new Error("No se pudo consultar el pedido.");
-        const data = (await response.json()) as EstadoPedido;
+        // El redirect de Mercado Pago incluye payment_id. Lo consultamos desde
+        // nuestro servidor con el Access Token; nunca confiamos en status de la URL.
+        if (paymentId) {
+          const confirmacion = await fetch("/api/pedido/confirmar-pago", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ numero, token, paymentId }),
+            cache: "no-store",
+          });
+          const pago = await confirmacion.json();
+          if (!activo) return;
+          if (confirmacion.ok && pago.pagado === true) {
+            setEstado("pagado");
+            vaciarRef.current();
+            return;
+          }
+          if (confirmacion.ok && pago.status === "rejected") {
+            setEstado("rechazado");
+            return;
+          }
+        }
+
+        // El webhook puede llegar antes o después del redirect; consultamos Supabase
+        // como fuente de verdad y dejamos varios intentos para dar tiempo al proceso.
+        const response = await fetch(`/api/pedido/estado?numero=${encodeURIComponent(numero)}&token=${encodeURIComponent(token)}`, { cache: "no-store" });
+        const data = await response.json();
         if (!activo) return;
-        setEstado(data);
-        setError(false);
-        if (data.aprobado) {
-          vaciar();
-          setConsultando(false);
-          if (timer) clearInterval(timer);
+        if (response.ok && data.pagado === true) {
+          vaciarRef.current();
+          if (data.emailEnviado === true || !paymentId) {
+            setEstado("pagado");
+            return;
+          }
+        }
+        if (!response.ok && response.status === 404) {
+          setEstado("error");
           return;
         }
-        intentos += 1;
-        if (intentos >= 8) {
-          setConsultando(false);
-          if (timer) clearInterval(timer);
-        }
       } catch {
-        if (!activo) return;
-        setError(true);
-        intentos += 1;
-        if (intentos >= 8) {
-          setConsultando(false);
-          if (timer) clearInterval(timer);
-        }
+        // Se reintenta: Mercado Pago o el webhook pueden tardar unos segundos.
       }
+
+      if (!activo) return;
+      if (intentos >= 12) {
+        setEstado("pendiente");
+        return;
+      }
+      timeout = setTimeout(consultar, 2500);
     };
 
     void consultar();
-    timer = setInterval(() => void consultar(), 4000);
     return () => {
       activo = false;
-      if (timer) clearInterval(timer);
+      if (timeout) clearTimeout(timeout);
     };
-  }, [numero, vaciar]);
+  }, [numero, token, paymentId]);
 
-  const aprobado = Boolean(estado?.aprobado);
-  const rechazado = estado?.pago === "rejected" || estado?.pago === "cancelled";
+  const titulo = estado === "pagado" ? "Pago confirmado" : estado === "rechazado" ? "Pago no aprobado" : estado === "error" ? "No pudimos consultar el pedido" : estado === "pendiente" ? "Pago en proceso" : "Confirmando tu pago";
+  const mensaje = estado === "pagado"
+    ? "Tu pago fue verificado en nuestro servidor. Phantom Protein recibió tu pedido y te enviaremos la información del despacho por correo."
+    : estado === "rechazado"
+      ? "Mercado Pago no informó un pago aprobado. Puedes volver al checkout e intentarlo nuevamente."
+      : estado === "error"
+        ? "No pudimos validar la referencia del pedido. Escríbenos para revisarlo antes de volver a pagar."
+        : estado === "pendiente"
+          ? "Tu pedido está registrado, pero todavía no vemos una aprobación de pago. No vuelvas a pagar por ahora; revisa tu correo o contáctanos si sigue igual."
+          : "Estamos consultando el estado del pedido con nuestro servidor. No cierres esta página todavía.";
 
   return (
-    <main className="min-h-screen bg-black px-4 py-24 text-white">
+    <main className="min-h-[65vh] bg-black px-4 py-20 text-white sm:py-24">
       <div className="mx-auto max-w-xl rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center shadow-2xl sm:p-12">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-2xl">
-          {aprobado ? "✓" : rechazado ? "!" : "…"}
-        </div>
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-2xl text-[#EBD6A8]">{estado === "pagado" ? "✓" : estado === "rechazado" || estado === "error" ? "!" : "…"}</div>
         <p className="mb-3 text-xs font-semibold tracking-[0.3em] text-[#D4AF37]">PHANTOM PROTEIN</p>
-        <h1 className="text-3xl font-semibold sm:text-4xl">
-          {aprobado ? "Pago confirmado" : rechazado ? "Pago no aprobado" : consultando ? "Verificando tu pago" : "Pedido pendiente de confirmación"}
-        </h1>
-        {numero && <p className="mt-4 text-gray-400">Pedido <span className="font-semibold text-white">{numero}</span></p>}
-        <p className="mx-auto mt-6 max-w-md leading-7 text-gray-300">
-          {aprobado
-            ? "Mercado Pago confirmó el pago. Tu pedido quedó registrado y estamos preparando el despacho."
-            : rechazado
-              ? "El pago no fue aprobado. Puedes volver al checkout e intentarlo nuevamente."
-              : consultando
-                ? "Estamos consultando el estado directamente en nuestros registros. Esto puede tardar unos segundos. No vuelvas a pagar mientras verificamos."
-                : error
-                  ? "No pudimos consultar el estado en este momento. Tu pedido no se marcará como pagado hasta recibir confirmación válida de Mercado Pago."
-                  : "Todavía no recibimos la confirmación del pago. Si pagaste, espera unos minutos y vuelve a consultar; no necesitas ingresar tus datos otra vez."}
-        </p>
+        <h1 className="text-3xl font-semibold sm:text-4xl">{titulo}</h1>
+        {numero && <p className="mt-4 text-sm text-gray-400">Pedido <span className="font-semibold text-white">{numero}</span></p>}
+        <p className="mx-auto mt-6 max-w-md leading-7 text-gray-300">{mensaje}</p>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link href="/productos" className="rounded-full bg-white px-6 py-3 font-semibold text-black transition hover:bg-gray-200">Volver a productos</Link>
-          {!aprobado && <Link href="/checkout" className="rounded-full border border-white/15 px-6 py-3 font-semibold text-white transition hover:border-[#EBD6A8] hover:text-[#EBD6A8]">Volver al checkout</Link>}
+          {estado !== "pagado" && <Link href="/checkout" className="rounded-full border border-white/15 px-6 py-3 font-semibold text-white transition hover:border-[#D4AF37] hover:text-[#D4AF37]">Volver al checkout</Link>}
         </div>
       </div>
     </main>
@@ -104,7 +115,7 @@ function ConfirmacionContenido() {
 }
 
 function CargandoConfirmacion() {
-  return <main className="flex min-h-screen items-center justify-center bg-black px-4 text-white"><div className="text-center"><p className="text-xs font-semibold tracking-[0.3em] text-[#D4AF37]">PHANTOM PROTEIN</p><p className="mt-4 text-gray-400">Cargando confirmación...</p></div></main>;
+  return <main className="flex min-h-[65vh] items-center justify-center bg-black px-4 text-white"><div className="text-center"><p className="text-xs font-semibold tracking-[0.3em] text-[#D4AF37]">PHANTOM PROTEIN</p><p className="mt-4 text-gray-400">Cargando confirmación...</p></div></main>;
 }
 
 export default function ConfirmacionPedido() {

@@ -29,7 +29,7 @@ export default function LineaObjetivos() {
             <p className="mb-3 text-[9px] tracking-[0.25em] text-[#EBD6A8]/75">ENCUENTRA TU ENFOQUE</p>
             <h2 className="text-2xl font-bold uppercase tracking-[-0.035em] text-[#F5F3EE] sm:text-3xl md:text-4xl">COMPRA POR OBJETIVO</h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-3 lg:gap-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4 lg:gap-5">
             {catalogoProductos.map((producto) => (
               <Link key={producto.slug} id={`objetivo-${producto.slug}`} href={`/productos/${producto.slug}`} className="group relative isolate block aspect-[4/4.5] min-h-[270px] overflow-hidden bg-[#080808] sm:aspect-[4/5] sm:min-h-0">
                 <Image src={producto.objetivoImagen} alt={producto.objetivoTexto} fill quality={92} sizes="(max-width: 640px) 94vw, (max-width: 1024px) 32vw, 420px" className="object-cover transition duration-700 group-hover:scale-105" />

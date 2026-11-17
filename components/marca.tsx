@@ -31,12 +31,9 @@ export default function Marca() {
             {datos.map((dato) => <div key={dato.texto} className="border border-white/10 px-4 py-4 sm:px-5 sm:py-5"><p className="text-2xl font-extrabold tracking-tight text-[#EBD6A8] sm:text-3xl">{dato.valor}</p><p className="mt-1.5 text-[10px] leading-4 text-white/55 sm:text-xs">{dato.texto}</p></div>)}
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center gap-5 border-t border-white/10 pt-6 sm:gap-8">
+          <div className="mt-7 flex items-center gap-5 border-t border-white/10 pt-6 sm:gap-8">
             <div className="flex h-[92px] w-[108px] items-center justify-center sm:h-[122px] sm:w-[138px]">
-              <Image src="/images/phantom/sello-fda.webp" alt="Sello gráfico FDA proporcionado por Phantom Protein" width={354} height={302} quality={95} className="h-full w-full object-contain" />
-            </div>
-            <div className="flex h-[92px] w-[108px] items-center justify-center sm:h-[122px] sm:w-[138px]">
-              <Image src="/images/phantom/sello-haccp.webp" alt="Sello gráfico HACCP proporcionado por Phantom Protein" width={316} height={306} quality={95} className="h-full w-full object-contain" />
+              <Image src="/images/phantom/sello-haccp.webp" alt="Sello HACCP" width={316} height={306} quality={95} className="h-full w-full object-contain" />
             </div>
           </div>
           <Link href="/productos/proteina" className="mt-7 inline-flex items-center gap-3 border-b border-white/25 pb-2 text-[9px] font-semibold tracking-[0.18em] text-white transition hover:border-[#EBD6A8] hover:text-[#EBD6A8]">DESCUBRIR PHANTOM PROTEIN <span aria-hidden="true">→</span></Link>

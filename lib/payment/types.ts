@@ -14,15 +14,21 @@ export type ClientePedido = {
 export type ItemPedido = {
   id: string;
   nombre: string;
-  precio: number;
+  precio: number; // precio unitario efectivamente cobrado
+  precioOriginal?: number;
   cantidad: number;
-  subtotal: number;
+  subtotal: number; // subtotal efectivamente cobrado
+  subtotalOriginal?: number;
+  descuento?: number;
 };
 
 export type OrdenPago = {
   numero: string;
+  tokenConfirmacion: string;
   items: ItemPedido[];
-  subtotal: number;
+  subtotal: number; // antes del descuento
+  descuento: number;
+  codigoDescuento: string | null;
   costoEnvio: number;
   total: number;
   cliente: ClientePedido;

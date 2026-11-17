@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s | Phantom Protein",
   },
   description:
-    "Proteína de clara de huevo de alta biodisponibilidad, sin azúcar añadida y sin sellos. 25 g de proteína por porción, diseñada para rendimiento real.",
+    "Proteína de clara de huevo, creatina monohidratada y colágeno + açaí. Conoce los productos y packs de Phantom Protein.",
   keywords: [
     "proteína de clara de huevo",
     "suplementos Chile",

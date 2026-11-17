@@ -4,6 +4,8 @@ import Productos from "@/components/productos";
 import VideoOjos from "@/components/video-ojos";
 import Marca from "@/components/marca";
 import PorQuePhantom from "@/components/por-que-phantom";
+import BlackFridayBanner from "@/components/black-friday-banner";
+import Resenas from "@/components/resenas";
 
 export const metadata: Metadata = {
   title: "Inicio",
@@ -20,5 +22,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <><HeroHome /><Productos /><VideoOjos /><PorQuePhantom /><Marca /></>;
+  return <><HeroHome /><BlackFridayBanner /><Productos /><Resenas /><VideoOjos /><PorQuePhantom /><Marca /></>;
 }

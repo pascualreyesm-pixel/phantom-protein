@@ -37,3 +37,8 @@ next-env.d.ts
 
 # contentlayer
 .contentlayer
+
+# local archives / helper files (do not push)
+*.zip
+INSTRUCCIONES.txt
+e -Force .git

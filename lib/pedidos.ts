@@ -1,10 +1,13 @@
+import { randomBytes } from "node:crypto";
+
 export function generarNumeroPedido() {
   const fecha = new Date();
   const yyyy = fecha.getFullYear();
   const mm = String(fecha.getMonth() + 1).padStart(2, "0");
   const dd = String(fecha.getDate()).padStart(2, "0");
-  const azar = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `PH-${yyyy}${mm}${dd}-${azar}`;
+  const azar = randomBytes(5).toString("hex").toUpperCase();
+  const prefijo = process.env.VERCEL_ENV === "preview" ? "PH-TEST" : "PH";
+  return `${prefijo}-${yyyy}${mm}${dd}-${azar}`;
 }
 
 export type EstadoPedido =

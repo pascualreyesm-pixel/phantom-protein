@@ -19,6 +19,9 @@ create table if not exists public.pedidos (
   region text not null,
   items jsonb not null,
   subtotal integer not null check (subtotal >= 0),
+  descuento integer not null default 0 check (descuento >= 0),
+  codigo_descuento text,
+  token_confirmacion uuid,
   costo_envio integer not null check (costo_envio >= 0),
   total integer not null check (total >= 0),
   mercadopago_order_id text unique,
@@ -31,12 +34,17 @@ create table if not exists public.pedidos (
   updated_at timestamptz not null default now()
 );
 
+alter table public.pedidos add column if not exists descuento integer not null default 0;
+alter table public.pedidos add column if not exists codigo_descuento text;
+alter table public.pedidos add column if not exists token_confirmacion uuid;
 alter table public.pedidos add column if not exists mercadopago_order_id text unique;
 alter table public.pedidos add column if not exists mercadopago_payment_id text unique;
 alter table public.pedidos add column if not exists mercadopago_status text;
 alter table public.pedidos add column if not exists mercadopago_status_detail text;
 alter table public.pedidos add column if not exists pagado_at timestamptz;
 alter table public.pedidos add column if not exists email_enviado_at timestamptz;
+
+create unique index if not exists pedidos_token_confirmacion_uidx on public.pedidos (token_confirmacion) where token_confirmacion is not null;
 
 create index if not exists pedidos_estado_idx on public.pedidos (estado);
 create index if not exists pedidos_created_at_idx on public.pedidos (created_at desc);

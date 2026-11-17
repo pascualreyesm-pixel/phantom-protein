@@ -1,12 +1,15 @@
-import { randomUUID } from "node:crypto";
 import { PaymentProvider, OrdenPago, ResultadoPago } from "./types";
 
-function normalizarBaseUrl(url: string) {
-  const parsed = new URL(url);
-  // El dominio apex redirige a www en Vercel. Mercado Pago debe recibir
-  // directamente la URL canónica para evitar respuestas 308 en el webhook.
-  if (parsed.hostname === "phantomprotein.cl") parsed.hostname = "www.phantomprotein.cl";
-  return parsed.toString().replace(/\/+$/, "");
+function obtenerBaseUrl() {
+  // Preview debe volver y notificar al deployment aislado, no a la tienda real.
+  if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/+$/, "");
+  }
+  const raw = process.env.NEXT_PUBLIC_URL;
+  if (!raw) throw new Error("Falta NEXT_PUBLIC_URL en las variables de entorno.");
+  const url = raw.replace(/\/+$/, "");
+  if (!/^https:\/\//i.test(url)) throw new Error("NEXT_PUBLIC_URL debe ser una URL HTTPS pública para Mercado Pago.");
+  return url;
 }
 
 export const mercadoPagoProvider: PaymentProvider = {
@@ -14,46 +17,28 @@ export const mercadoPagoProvider: PaymentProvider = {
 
   async crearPago(orden: OrdenPago): Promise<ResultadoPago> {
     const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
-    const baseUrlRaw = process.env.NEXT_PUBLIC_URL;
-
     if (!token) throw new Error("Falta MERCADOPAGO_ACCESS_TOKEN en las variables de entorno.");
-    if (!baseUrlRaw) throw new Error("Falta NEXT_PUBLIC_URL en las variables de entorno.");
 
-    let baseUrl: string;
-    try {
-      baseUrl = normalizarBaseUrl(baseUrlRaw);
-    } catch {
-      throw new Error("NEXT_PUBLIC_URL debe ser una URL HTTPS pública válida.");
-    }
-    if (!/^https:\/\//i.test(baseUrl)) {
-      throw new Error("NEXT_PUBLIC_URL debe ser una URL HTTPS pública para Mercado Pago.");
-    }
-
-    const items = orden.items.map((item) => ({
+    const baseUrl = obtenerBaseUrl();
+    const productos = orden.items.map((item) => ({
       id: item.id,
       title: item.nombre,
       quantity: item.cantidad,
       unit_price: item.precio,
       currency_id: "CLP",
     }));
+    const items = orden.costoEnvio > 0
+      ? [...productos, { id: "shipping", title: "Envío", quantity: 1, unit_price: orden.costoEnvio, currency_id: "CLP" }]
+      : productos;
 
-    if (orden.costoEnvio > 0) {
-      items.push({
-        id: "shipping",
-        title: "Envío",
-        quantity: 1,
-        unit_price: orden.costoEnvio,
-        currency_id: "CLP",
-      });
-    }
-
+    const params = `numero=${encodeURIComponent(orden.numero)}&token=${encodeURIComponent(orden.tokenConfirmacion)}`;
     const respuesta = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
       headers: {
         accept: "application/json",
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-        "X-Idempotency-Key": randomUUID(),
+        "X-Idempotency-Key": `phantom-${orden.numero}`,
       },
       body: JSON.stringify({
         items,
@@ -64,14 +49,18 @@ export const mercadoPagoProvider: PaymentProvider = {
           email: orden.cliente.email,
         },
         back_urls: {
-          success: `${baseUrl}/pedido/confirmacion?numero=${encodeURIComponent(orden.numero)}&status=approved`,
-          pending: `${baseUrl}/pedido/confirmacion?numero=${encodeURIComponent(orden.numero)}&status=pending`,
-          failure: `${baseUrl}/checkout?payment=failed&numero=${encodeURIComponent(orden.numero)}`,
+          success: `${baseUrl}/pedido/confirmacion?${params}`,
+          pending: `${baseUrl}/pedido/confirmacion?${params}&resultado=pending`,
+          failure: `${baseUrl}/pedido/confirmacion?${params}&resultado=failure`,
         },
         auto_return: "approved",
         notification_url: `${baseUrl}/api/webhooks/mercadopago`,
         statement_descriptor: "PHANTOM PROTEIN",
-        metadata: { numero_pedido: orden.numero },
+        metadata: {
+          numero_pedido: orden.numero,
+          codigo_descuento: orden.codigoDescuento,
+          descuento_clp: orden.descuento,
+        },
       }),
       cache: "no-store",
     });
@@ -82,20 +71,11 @@ export const mercadoPagoProvider: PaymentProvider = {
       throw new Error(`Mercado Pago rechazó la creación del pago (HTTP ${respuesta.status}): ${detalle}`);
     }
 
-    const datos = (await respuesta.json()) as {
-      id?: string;
-      init_point?: string;
-      sandbox_init_point?: string;
-    };
-
+    const datos = (await respuesta.json()) as { id?: string; init_point?: string };
     if (!datos.id || !datos.init_point) {
       throw new Error("Mercado Pago no devolvió una preferencia o init_point válida.");
     }
 
-    return {
-      redireccionar: true,
-      url: datos.init_point,
-      orderId: datos.id,
-    };
+    return { redireccionar: true, url: datos.init_point, orderId: datos.id };
   },
 };

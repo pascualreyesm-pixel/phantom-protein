@@ -2,33 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const numero = request.nextUrl.searchParams.get("numero")?.trim();
-  if (!numero || numero.length > 64 || !/^[A-Za-z0-9-]+$/.test(numero)) {
-    return NextResponse.json({ error: "Número de pedido inválido." }, { status: 400 });
+  const url = new URL(request.url);
+  const numero = url.searchParams.get("numero")?.trim();
+  const token = url.searchParams.get("token")?.trim();
+  if (!numero || !token || token.length < 30) {
+    return NextResponse.json({ error: "Referencia de pedido inválida." }, { status: 400 });
   }
-
   try {
     const supabase = getSupabaseServer();
-    const { data, error } = await supabase
-      .from("pedidos")
-      .select("numero_pedido, estado, mercadopago_status")
-      .eq("numero_pedido", numero)
-      .maybeSingle();
-
+    const { data, error } = await supabase.from("pedidos")
+      .select("numero_pedido, estado, mercadopago_status, pagado_at, email_enviado_at")
+      .eq("numero_pedido", numero).eq("token_confirmacion", token).maybeSingle();
     if (error) throw error;
-    if (!data) return NextResponse.json({ error: "Pedido no encontrado." }, { status: 404 });
-
-    return NextResponse.json({
-      numero: data.numero_pedido,
-      estado: data.estado,
-      pago: data.mercadopago_status,
-      aprobado: data.estado === "pagado" && data.mercadopago_status === "approved",
-    }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    if (!data) return NextResponse.json({ error: "No encontramos el pedido." }, { status: 404 });
+    const pagado = data.estado === "pagado" || Boolean(data.pagado_at);
+    return NextResponse.json({ numero: data.numero_pedido, estado: data.estado, pago: data.mercadopago_status, pagado, emailEnviado: Boolean(data.email_enviado_at) }, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   } catch (error) {
     console.error("Error consultando estado del pedido:", error);
-    return NextResponse.json({ error: "No se pudo consultar el estado del pedido." }, { status: 500 });
+    return NextResponse.json({ error: "No pudimos consultar el estado del pedido." }, { status: 500 });
   }
 }

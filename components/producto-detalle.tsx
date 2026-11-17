@@ -45,6 +45,7 @@ export default function ProductoDetalle({ slug, varianteInicial }: { slug: strin
 
   if (!grupo || !productoActual) return null;
   const imagenSeleccionada = imagenes[imagenActiva] ?? imagenes[0];
+  const esPack = grupo.slug === "pack-proteina-creatina";
   const esTablaNutricional = imagenSeleccionada.includes("tabla-nutricional-");
   const saborSeleccionado = varianteId === "proteina-chocolate" ? "chocolate" : "vainilla";
   const altImagenSeleccionada = esTablaNutricional
@@ -82,12 +83,26 @@ export default function ProductoDetalle({ slug, varianteInicial }: { slug: strin
             <p className="text-[9px] font-medium tracking-[0.24em] text-[#EBD6A8]/75">PRODUCTO DESTACADO</p>
             <h1 className="mt-4 max-w-[570px] text-3xl font-extrabold uppercase leading-[0.98] tracking-[-0.04em] text-[#F5F3EE] sm:text-4xl lg:text-5xl">{grupo.nombre}</h1>
             <p className="mt-3 text-[9px] tracking-[0.18em] text-white/45">{grupo.etiqueta}</p>
-            <p className="mt-5 text-xl font-semibold text-[#EBD6A8]">{precioCLP(productoActual.precio)}</p>
+            <div className="mt-5 flex flex-wrap items-baseline gap-3">
+              <p className="text-xl font-semibold text-[#EBD6A8]">{precioCLP(productoActual.precio)}</p>
+              {productoActual.precioReferencia && <><p className="text-sm text-white/35 line-through">{precioCLP(productoActual.precioReferencia)}</p><span className="text-[9px] font-semibold tracking-[0.12em] text-[#EBD6A8]">AHORRAS {precioCLP(productoActual.precioReferencia - productoActual.precio)}</span></>}
+            </div>
+            {esPack && <p className="mt-2 text-[10px] leading-5 text-white/45">Precio especial de pack. No acumulable con BLACKPHANTOM15.</p>}
 
-            {grupo.variantes && <div className="mt-6"><p className="mb-3 text-[9px] font-medium tracking-[0.18em] text-white/45">SABOR</p><div className="flex flex-wrap gap-2">{grupo.variantes.map((variante) => <button key={variante.id} type="button" onClick={() => seleccionarVariante(variante.id)} aria-pressed={varianteId === variante.id} className={`min-h-9 rounded-full border px-5 py-2 text-[10px] transition ${varianteId === variante.id ? "border-[#F0E5CF] bg-[#F0E5CF] text-[#171511]" : "border-white/25 bg-transparent text-white hover:border-[#EBD6A8]"}`}>{variante.etiqueta}</button>)}</div></div>}
+            {grupo.variantes && <div className="mt-6"><p className="mb-3 text-[9px] font-medium tracking-[0.18em] text-white/45">{esPack ? "SABOR DE PROTEÍNA DEL PACK" : "SABOR"}</p><div className="flex flex-wrap gap-2">{grupo.variantes.map((variante) => <button key={variante.id} type="button" onClick={() => seleccionarVariante(variante.id)} aria-pressed={varianteId === variante.id} className={`min-h-9 rounded-full border px-5 py-2 text-[10px] transition ${varianteId === variante.id ? "border-[#F0E5CF] bg-[#F0E5CF] text-[#171511]" : "border-white/25 bg-transparent text-white hover:border-[#EBD6A8]"}`}>{variante.etiqueta}</button>)}</div></div>}
 
             <p className="mt-6 max-w-[560px] text-sm leading-6 text-white/65">{productoActual.descripcion}</p>
             <ul className="mt-5 space-y-2 text-[11px] leading-5 text-white/65">{productoActual.detalles.map((detalle) => <li key={detalle} className="flex gap-2"><span className="text-[#EBD6A8]">•</span><span>{detalle}</span></li>)}</ul>
+
+            {productoActual.ingredientes && <details className="mt-7 border-y border-white/10 py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[10px] font-semibold tracking-[0.16em] text-white/80 transition hover:text-[#EBD6A8]">
+                VER INGREDIENTES Y COMPOSICIÓN <span className="text-lg font-normal text-[#EBD6A8]">＋</span>
+              </summary>
+              <div className="mt-4 space-y-3 text-[11px] leading-6 text-white/60">
+                <p>{productoActual.ingredientes}</p>
+                {productoActual.alergenos && <p className="text-white/45">{productoActual.alergenos}</p>}
+              </div>
+            </details>}
 
             <div className="mt-7 flex flex-wrap items-center gap-3">
               <div className="flex h-12 items-center border border-white/20"><button type="button" onClick={() => setCantidad((v) => Math.max(1, v - 1))} aria-label="Reducir cantidad" className="h-12 w-11 text-lg text-white/70 transition hover:text-[#EBD6A8]">−</button><span className="w-8 text-center text-xs tabular-nums">{cantidad}</span><button type="button" onClick={() => setCantidad((v) => Math.min(20, v + 1))} aria-label="Aumentar cantidad" className="h-12 w-11 text-lg text-white/70 transition hover:text-[#EBD6A8]">+</button></div>

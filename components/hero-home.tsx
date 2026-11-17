@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 
 const DURACION_SLIDE = 6500;
 const slides = [
@@ -19,6 +20,7 @@ export default function HeroHome() {
   const [activo, setActivo] = useState(0);
   const [pausado, setPausado] = useState(false);
   const [movimientoReducido, setMovimientoReducido] = useState(false);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -38,8 +40,19 @@ export default function HeroHome() {
     setActivo((prev) => (prev + delta + slides.length) % slides.length);
   }
 
+  function iniciarDeslizamiento(event: TouchEvent<HTMLElement>) {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  }
+
+  function terminarDeslizamiento(event: TouchEvent<HTMLElement>) {
+    if (touchStartX.current === null) return;
+    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) > 48) cambiar(delta < 0 ? 1 : -1);
+  }
+
   return (
-    <section aria-label="Presentación de Phantom Protein" className="relative isolate overflow-hidden bg-black text-white">
+    <section aria-label="Presentación de Phantom Protein" onTouchStart={iniciarDeslizamiento} onTouchEnd={terminarDeslizamiento} className="relative isolate overflow-hidden bg-black text-white">
       <div className="relative h-[min(690px,calc(100svh-96px))] min-h-[535px] sm:min-h-[580px] lg:min-h-[590px]">
         {slides.map((slide, index) => (
           <div key={slide.id} aria-hidden={activo !== index} className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${activo === index ? "z-10 opacity-100" : "pointer-events-none z-0 opacity-0"}`}>
@@ -62,7 +75,10 @@ export default function HeroHome() {
 
             {slide.tipo === "modelos" && <>
               <Image src="/images/phantom/hero-modelos.webp" alt="Modelos mostrando productos y ropa Phantom Protein" fill quality={98} sizes="100vw" className="object-cover object-[center_42%]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/10" />
+              <div className="absolute inset-x-0 bottom-[17%] z-20 flex justify-center px-4 sm:bottom-[15%]">
+                <Link href="/productos/pack-proteina-creatina" className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#F2E8D3] px-7 py-3 text-[9px] font-bold tracking-[0.16em] text-[#171511] shadow-xl transition hover:bg-white sm:min-h-12 sm:px-9 sm:text-[10px]">CONOCE NUESTROS PACKS</Link>
+              </div>
             </>}
 
             {slide.tipo === "conoce" && <>

@@ -1,84 +1,13 @@
-# CHANGELOG.md
+# Phantom Protein — Cambios de la entrega
 
-## [4.0.0] - 2025-02-04
-
-- Updgrade to Tailwind v4
-- Update dependencies
-
-## [3.1.0] - 2024-12-08
-
-- Update dependencies + Upgrade to Next.js 15
-
-## [3.0.2] - 2024-08-23
-
-- Remove unneeded scroll handler
-
-## [3.0.1] - 2024-06-20
-
-- Minor styling changes + Prettify code
-
-## [3.0.0] - 2024-06-18
-
-- Redesign the entire template
-
-## [2.4.0] - 2023-12-08
-
-Update to Next.js 14
-Update dependencies
-
-## [2.3.2] - 2023-10-04
-
-Update Twitter icon
-Update dependencies
-
-## [2.3.0] - 2023-06-20
-
-Fix issue with Google Fonts
-
-## [2.2.1] - 2023-06-13
-
-Fix minor issue
-
-## [2.2.0] - 2023-05-31
-
-Update dependencies and fix some issues
-
-## [2.1.0] - 2023-05-07
-
-Modal video improvements
-
-## [2.0.0] - 2023-03-31
-
-Conversion to Next.js
-
-## [1.3.3] - 2023-03-28
-
-- Fix video
-
-## [1.3.2] - 2023-03-28
-
-- Add self-hosted video
-
-## [1.3.1] - 2023-02-13
-
-- Update dependencies
-
-## [1.3.0] - 2022-07-15
-
-- Update dependencies
-- Update React to v18
-- Replace Sass with CSS files
-
-## [1.1.0] - 2022-01-27
-
-- Replace CRA (Create React App) with Vite
-- Remove Craco
-- Update dependencies
-
-## [1.0.1] - 2020-10-19
-
-Fix issue with testimonail image on mobile
-
-## [1.0.0] - 2020-10-15
-
-First release
+- Barra dorada del cupón BLACKPHANTOM15 bajo la navegación; se retira la antigua franja de envíos.
+- Campaña Black Friday adelantado y CTA de packs en la diapositiva de modelos.
+- Pack de proteína (vainilla o chocolate) + creatina 100% monohidratada a $69.300.
+- Descuento calculado también en el servidor; excluye creatina y productos pack; no descuenta el envío.
+- Ingredientes desplegables en las fichas de producto.
+- Sello FDA independiente retirado de la sección de marca; se mantiene HACCP.
+- Carrusel con deslizamiento táctil en móvil.
+- Sección de opiniones anónimas construida a partir de opiniones que el dueño de la marca indicó haber recibido.
+- Correo de pedido dirigido a phantomproteinchile@gmail.com, con remitente del dominio verificado.
+- Checkout Pro Preferences API, validación de firma HMAC, monto y moneda, consulta directa del pago tras el retorno y estado de pedido que no confía en el parámetro status del navegador.
+- Pedidos Preview identificados como PH-TEST y correos etiquetados como PRUEBA SANDBOX.
