@@ -96,6 +96,13 @@ export async function POST(request: NextRequest) {
     if (type && type !== "payment") return NextResponse.json({ received: true });
     if (!dataId) return NextResponse.json({ received: true });
 
+    // Las simulaciones de Mercado Pago llevan live_mode=false y usan IDs ficticios.
+    // Se responde 200 sin validar firma, consultar pagos ni modificar pedidos:
+    // este camino solo confirma que el endpoint recibe la simulación.
+    if (body.live_mode === false) {
+      return NextResponse.json({ received: true, simulation: true });
+    }
+
     const requestId = request.headers.get("x-request-id");
     const signature = request.headers.get("x-signature");
     if (!firmaValida({ xSignature: signature, xRequestId: requestId, dataId, secret: webhookSecret })) {
@@ -109,12 +116,6 @@ export async function POST(request: NextRequest) {
         dataIdFromQuery: Boolean(queryDataId),
       });
       return NextResponse.json({ error: "Firma inválida." }, { status: 401 });
-    }
-
-    // El simulador de Mercado Pago usa live_mode=false y un ID ficticio.
-    // Tras validar la firma, se confirma la recepción sin consultar ni alterar pedidos.
-    if (body.live_mode === false) {
-      return NextResponse.json({ received: true, simulation: true });
     }
 
     const pago = await obtenerPago(dataId);
